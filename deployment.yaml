@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: flask-app-deployment-prod
+  namespace: prod
   labels:
     app: flask-app
 spec:
@@ -16,7 +17,7 @@ spec:
     spec:
       containers:
       - name: flask-app
-        image: sanjeevkt720/jenkins-flask-app
+        image: <replace-with-docker-image>  # Example: toluid/tester:latest
         ports:
         - containerPort: 5000
         resources:
@@ -26,3 +27,5 @@ spec:
           requests:
             cpu: "0.5"
             memory: "200Mi"
+      imagePullSecrets:
+      - name: regcred  # Reference the DockerHub secret here
