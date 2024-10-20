@@ -83,26 +83,6 @@ pipeline {
                 }
             }
         }
-        stage('Create Kubernetes Secret') {
-            steps {
-                withCredentials([
-                    string(credentialsId: 'dockerusr', variable: 'DOCKER_USER'),
-                    string(credentialsId: 'dockerpwd', variable: 'DOCKER_PASS')
-                ]) {
-                    script {
-                        sh '''
-                        kubectl create secret docker-registry regcred \
-                        --docker-server=https://index.docker.io/v1/ \
-                        --docker-username=$DOCKER_USER \
-                        --docker-password=$DOCKER_PASS \
-                        --docker-email=toluwanimibanji@gmail.com \
-                        --namespace default || echo "Secret already exists"
-                        '''
-                        echo 'Kubernetes secret for DockerHub created or verified.'
-                    }
-                }
-            }
-        }
 
         stage('Deploy to EKS Prod Environment') {
             steps {
