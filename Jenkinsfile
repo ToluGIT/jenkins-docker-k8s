@@ -16,7 +16,7 @@ pipeline {
 
         stage('Checkout Code') {
             steps {
-                sh 'git clone https://github.com/ToluGIT/jenkins-docker-k8s.git'
+                sh 'sleep 10'
             }
         }
 
