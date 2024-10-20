@@ -109,13 +109,13 @@ pipeline {
                 script {
                     withCredentials([aws(accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY', credentialsId: 'aws')]) {
                         def deploymentExists = sh(
-                            script: "kubectl get deployment flask-app-deployment-prod -n prod -o json",
+                            script: "kubectl get deployment flask-app-deployment-prod -n default -o json",
                             returnStatus: true
                         )
 
                         if (deploymentExists == 0) {
                             echo "Updating Kubernetes deployment with new Docker image ${env.DOCKER_IMAGE}"
-                            sh "kubectl set image -n prod deployment/flask-app-deployment-prod flask-app=${env.DOCKER_IMAGE} --record"
+                            sh "kubectl set image -n default deployment/flask-app-deployment-prod flask-app=${env.DOCKER_IMAGE} --record"
                         } else {
                             echo "Creating new Kubernetes deployment"
                             sh "sed -i 's|image: .*|image: ${env.DOCKER_IMAGE}|' deployment.yaml"
