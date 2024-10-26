@@ -30,7 +30,7 @@ pipeline {
                 . venv/bin/activate
                 pytest
                 '''
-                junit '**/test-reports/*.xml'  // Optional: Archive test reports
+                junit '**/test-reports/*.xml'  // Archive test reports
             }
         }
 
