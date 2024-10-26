@@ -10,7 +10,7 @@ pipeline {
     stages {
         stage('Checkout Code') {
             steps {
-                sh 'sleep 5'
+                checkout scm
             }
         }
 
@@ -30,6 +30,7 @@ pipeline {
                 . venv/bin/activate
                 pytest
                 '''
+                junit '**/test-reports/*.xml'  // Optional: Archive test reports
             }
         }
 
@@ -42,7 +43,6 @@ pipeline {
                     sh '''
                     echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
                     '''
-                    echo 'Login successful'
                 }
             }
         }
@@ -52,6 +52,23 @@ pipeline {
                 script {
                     echo "Building Docker image ${IMAGE_TAG}"
                     sh "docker build -t ${IMAGE_TAG} ."
+                }
+            }
+        }
+        
+        stage('Scan Docker Image for Vulnerabilities') {
+            steps {
+                script {
+                    echo "Scanning Docker image: ${IMAGE_TAG}"
+                    
+                    def scanOutput = sh(script: "tmas scan docker:${IMAGE_TAG} -VMS --region ap-southeast-1", returnStdout: true).trim()
+                    echo "Scan Output: ${scanOutput}"
+
+                    if (scanOutput.contains('"severity": "Critical"')) {
+                        error("Critical severity vulnerability detected! Pipeline will be terminated.")
+                    } else {
+                        echo("No critical severity vulnerabilities detected. Pipeline will continue.")
+                    }
                 }
             }
         }
@@ -82,10 +99,7 @@ pipeline {
             steps {
                 script {
                     withCredentials([aws(accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY', credentialsId: 'aws')]) {
-                        def deploymentExists = sh(
-                            script: "kubectl get deployment flask-app-deployment-prod -n default -o json",
-                            returnStatus: true
-                        )
+                        def deploymentExists = sh(script: "kubectl get deployment flask-app-deployment-prod -n default -o json", returnStatus: true)
 
                         if (deploymentExists == 0) {
                             echo "Updating Kubernetes deployment with new Docker image ${env.DOCKER_IMAGE}"
@@ -97,6 +111,7 @@ pipeline {
                         }
 
                         echo "Kubernetes deployment completed successfully"
+                        sh "kubectl rollout status deployment/flask-app-deployment-prod -n default"
                     }
                 }
             }
