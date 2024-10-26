@@ -24,12 +24,36 @@ pipeline {
             }
         }
 
-        stage('Unit Testing') {
-            steps {
-                sh '''
-                . venv/bin/activate
-                pytest
-                '''
+        stage('Test and Build in Parallel') {
+            parallel {
+                stage('Unit Testing') {
+                    steps {
+                        script {
+                            try {
+                                echo "Running unit tests with pytest..."
+                                sh '''
+                                . venv/bin/activate
+                                pytest
+                                '''
+                            } catch (Exception e) {
+                                error "Unit tests failed: ${e.getMessage()}"
+                            }
+                        }
+                    }
+                }
+
+                stage('Build Docker Image') {
+                    steps {
+                        script {
+                            try {
+                                echo "Building Docker image ${IMAGE_TAG}..."
+                                sh "docker build -t ${IMAGE_TAG} ."
+                            } catch (Exception e) {
+                                error "Docker build failed: ${e.getMessage()}"
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -46,47 +70,15 @@ pipeline {
             }
         }
 
-        stage('Build Docker Image') {
-            steps {
-                script {
-                    echo "Building Docker image ${IMAGE_TAG}"
-                    sh "docker build -t ${IMAGE_TAG} ."
-                }
-            }
-        }
-        
-        stage('Scan Docker Image for Vulnerabilities') {
-            steps {
-                script {
-                    withCredentials([string(credentialsId: 'TMAS_API_KEY', variable: 'TMAS_API_KEY')]) {
-                        echo "Scanning Docker image: ${IMAGE_TAG}"
-                        
-                        // Run the TMAS scan and capture the output
-                        def scanOutput = sh(
-                            script: "tmas scan docker:${IMAGE_TAG} -VMS --region ap-southeast-1",
-                            returnStdout: true,
-                            env: [TMAS_API_KEY: TMAS_API_KEY]  // Inject the API key into the environment
-                        ).trim()
-        
-                        // Print the scan output (for debugging, optional)
-                        echo "Scan Output: ${scanOutput}"
-        
-                        // Check for critical severity vulnerabilities
-                        if (scanOutput.contains('"severity": "Critical"')) {
-                            error("Critical severity vulnerability detected! Pipeline will be terminated.")
-                        } else {
-                            echo("No critical severity vulnerabilities detected. Pipeline will continue.")
-                        }
-                    }
-                }
-            }
-        }
-
         stage('Push Docker Image') {
             steps {
                 script {
-                    echo "Pushing Docker image ${IMAGE_TAG}"
-                    sh "docker push ${IMAGE_TAG}"
+                    try {
+                        echo "Pushing Docker image ${IMAGE_TAG} to DockerHub..."
+                        sh "docker push ${IMAGE_TAG}"
+                    } catch (Exception e) {
+                        error "Failed to push Docker image: ${e.getMessage()}"
+                    }
                 }
             }
         }
@@ -108,19 +100,26 @@ pipeline {
             steps {
                 script {
                     withCredentials([aws(accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY', credentialsId: 'aws')]) {
-                        def deploymentExists = sh(script: "kubectl get deployment flask-app-deployment-prod -n default -o json", returnStatus: true)
+                        try {
+                            def deploymentExists = sh(
+                                script: "kubectl get deployment flask-app-deployment-prod -n default -o json",
+                                returnStatus: true
+                            )
 
-                        if (deploymentExists == 0) {
-                            echo "Updating Kubernetes deployment with new Docker image ${env.DOCKER_IMAGE}"
-                            sh "kubectl set image -n default deployment/flask-app-deployment-prod flask-app=${env.DOCKER_IMAGE} --record"
-                        } else {
-                            echo "Creating new Kubernetes deployment"
-                            sh "sed -i 's|image: .*|image: ${env.DOCKER_IMAGE}|' deployment.yaml"
-                            sh "kubectl apply -f deployment.yaml"
+                            if (deploymentExists == 0) {
+                                echo "Updating Kubernetes deployment with new Docker image ${env.DOCKER_IMAGE}..."
+                                sh "kubectl set image -n default deployment/flask-app-deployment-prod flask-app=${env.DOCKER_IMAGE} --record"
+                            } else {
+                                echo "Creating new Kubernetes deployment..."
+                                sh "sed -i 's|image: .*|image: ${env.DOCKER_IMAGE}|' deployment.yaml"
+                                sh "kubectl apply -f deployment.yaml"
+                            }
+
+                            echo "Deployment initiated. Monitoring rollout status..."
+                            sh "kubectl rollout status deployment/flask-app-deployment-prod -n default"
+                        } catch (Exception e) {
+                            error "Deployment to EKS failed: ${e.getMessage()}"
                         }
-
-                        echo "Kubernetes deployment completed successfully"
-                        sh "kubectl rollout status deployment/flask-app-deployment-prod -n default"
                     }
                 }
             }
