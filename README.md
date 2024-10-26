@@ -30,7 +30,7 @@ The pipeline is defined in the **Jenkinsfile**, automating all key steps. Below 
       }
     }
     
-**Vulnerability Scanning (TMAS Integration)**
+**Container Image Scanning (TMAS Integration)**
 ---------------------------------------------
 
 
