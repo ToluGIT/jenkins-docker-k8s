@@ -24,33 +24,62 @@ pipeline {
             }
         }
 
-        stage('Test and Build in Parallel') {
-            parallel {
-                stage('Unit Testing') {
-                    steps {
-                        script {
-                            try {
-                                echo "Running unit tests with pytest..."
-                                sh '''
-                                . venv/bin/activate
-                                pytest
-                                '''
-                            } catch (Exception e) {
-                                error "Unit tests failed: ${e.getMessage()}"
-                            }
-                        }
+        stage('Run Unit Tests') {
+            steps {
+                script {
+                    try {
+                        echo "Running unit tests with pytest..."
+                        sh '''
+                        . venv/bin/activate
+                        pytest
+                        '''
+                    } catch (Exception e) {
+                        error "Unit tests failed: ${e.getMessage()}"
                     }
                 }
+            }
+        }
 
-                stage('Build Docker Image') {
-                    steps {
-                        script {
-                            try {
-                                echo "Building Docker image ${IMAGE_TAG}..."
-                                sh "docker build -t ${IMAGE_TAG} ."
-                            } catch (Exception e) {
-                                error "Docker build failed: ${e.getMessage()}"
+        stage('Build Docker Image') {
+            when {
+                expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' }
+            }
+            steps {
+                script {
+                    try {
+                        echo "Building Docker image ${IMAGE_TAG}..."
+                        sh "docker build -t ${IMAGE_TAG} ."
+                    } catch (Exception e) {
+                        error "Docker build failed: ${e.getMessage()}"
+                    }
+                }
+            }
+        }
+
+        stage('TMAS Vulnerability Scan') {
+            when {
+                expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' }
+            }
+            steps {
+                script {
+                    withCredentials([string(credentialsId: 'TMAS_API_KEY', variable: 'TMAS_API_KEY')]) {
+                        echo "Scanning Docker image ${IMAGE_TAG} for vulnerabilities..."
+                        try {
+                            def scanOutput = sh(
+                                script: "tmas scan docker:${IMAGE_TAG} -VMS --region ap-southeast-1",
+                                returnStdout: true,
+                                env: [TMAS_API_KEY: TMAS_API_KEY]
+                            ).trim()
+
+                            echo "Scan Output: ${scanOutput}"
+
+                            if (scanOutput.contains('"severity": "Critical"')) {
+                                error "Critical severity vulnerability detected! Pipeline stopped."
+                            } else {
+                                echo "No critical vulnerabilities detected. Continuing pipeline."
                             }
+                        } catch (Exception e) {
+                            error "Vulnerability scan failed: ${e.getMessage()}"
                         }
                     }
                 }
