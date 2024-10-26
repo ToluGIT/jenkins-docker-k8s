@@ -58,15 +58,25 @@ pipeline {
         stage('Scan Docker Image for Vulnerabilities') {
             steps {
                 script {
-                    echo "Scanning Docker image: ${IMAGE_TAG}"
-                    
-                    def scanOutput = sh(script: "tmas scan docker:${IMAGE_TAG} -VMS --region ap-southeast-1", returnStdout: true).trim()
-                    echo "Scan Output: ${scanOutput}"
-
-                    if (scanOutput.contains('"severity": "Critical"')) {
-                        error("Critical severity vulnerability detected! Pipeline will be terminated.")
-                    } else {
-                        echo("No critical severity vulnerabilities detected. Pipeline will continue.")
+                    withCredentials([string(credentialsId: 'TMAS_API_KEY', variable: 'TMAS_API_KEY')]) {
+                        echo "Scanning Docker image: ${IMAGE_TAG}"
+                        
+                        // Run the TMAS scan and capture the output
+                        def scanOutput = sh(
+                            script: "tmas scan docker:${IMAGE_TAG} -VMS --region ap-southeast-1",
+                            returnStdout: true,
+                            env: [TMAS_API_KEY: TMAS_API_KEY]  // Inject the API key into the environment
+                        ).trim()
+        
+                        // Print the scan output (for debugging, optional)
+                        echo "Scan Output: ${scanOutput}"
+        
+                        // Check for critical severity vulnerabilities
+                        if (scanOutput.contains('"severity": "Critical"')) {
+                            error("Critical severity vulnerability detected! Pipeline will be terminated.")
+                        } else {
+                            echo("No critical severity vulnerabilities detected. Pipeline will continue.")
+                        }
                     }
                 }
             }
