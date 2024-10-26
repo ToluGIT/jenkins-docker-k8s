@@ -34,7 +34,7 @@ The pipeline is defined in the **Jenkinsfile**, automating all key steps. Below 
 ---------------------------------------------
 
 
-One critical step in the pipeline is **vulnerability scanning** using **TMAS** (Trend Micro Application Security). This ensures that no Docker image with **critical vulnerabilities** gets deployed to production.
+One critical step in the pipeline is **vulnerability scanning** using **TMAS**. This ensures that no Docker image with **critical vulnerabilities** gets deployed to production.
 
 ### **How the Scan Works:**
 
