@@ -19,16 +19,15 @@ This project demonstrates a **complete CI/CD pipeline** using Jenkins for a simp
 The pipeline is defined in the **Jenkinsfile**, automating all key steps. Below is a high-level breakdown of the process:
 
 ### **Pipeline Steps (Jenkinsfile Snippet):**
-		```groovy
 		pipeline {
 			stages {
 				stage('Run Unit Tests') { ... }
 				stage('Build Docker Image') { ... }
 				stage('TMAS Vulnerability Scan') { ... }
 				stage('Push Docker Image') { ... }
-				stage('Deploy to EKS') { ... }
-			}
-		}
+		 		stage('Deploy to EKS') { ... }
+		         	}
+        		   }
 
 ------
 
@@ -42,7 +41,6 @@ This pipeline is designed with several **DevOps best practices** to ensure quali
 - If an error occurs (e.g., failed test or scan), the pipeline **stops immediately**, providing **meaningful error messages** for faster debugging.
 
 #### **Example Error Handling Snippet:**
-		```groovy
 		stage('Run Unit Tests') {
 			steps {
 				script {
@@ -57,7 +55,7 @@ This pipeline is designed with several **DevOps best practices** to ensure quali
 					}
 				}
 			}
-		}
+	       	   }
   
 ----------------
 
